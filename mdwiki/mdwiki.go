@@ -8,18 +8,17 @@ import (
   "net/http"
   "os"
 )
-
+var toc *bool
 func main() {
   port := flag.Int("port", 8000, "port to listen on")
+  toc = flag.Bool("toc", false, "true to automatically generate tables of content")
+  flag.Parse()
   http.HandleFunc("/", handler)
   hostPort := fmt.Sprintf("localhost:%d",*port)
   log.Fatal(http.ListenAndServe(hostPort, nil))  // port 80 access perm error
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-  fmt.Fprintln(w, "<html><head><title>MD Wiki</title></head><body>")
-  defer fmt.Fprintln(w, "</body></html>")
-  fmt.Fprintln(w, mdwiki.PrintPath(r.URL.Path))
   path := "." + r.URL.Path
   finfo, err := os.Stat(path)
   if err != nil {
@@ -27,8 +26,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
     return
   }
   if finfo.IsDir() {
-    fmt.Fprintln(w, mdwiki.FmtDir(path))
+    mdwiki.FmtDir(w, path)
   } else {
-    mdwiki.PrintFile(w, path)
+    mdwiki.PrintFile(w, path, *toc)
   }
 }

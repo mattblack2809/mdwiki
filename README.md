@@ -5,6 +5,15 @@ using pandoc to render markdown as HTML
 
 Features:
 
+* Listens on port 8000 or the port specified using -port=nnnn
+* File types handled as follows:
+    * .md files are converted to HTML (and cached)
+    * Setting -toc=true instructs pandoc to output a fully structered HTML
+    document with a table of contents - useful if the documents are not well
+    indexed
+    * HTML fragments are output (wrapped with a header, the path, and footer)
+    * HTML fully structured files are output with the path injected at the start of the body
+    * Other file types are output to the browser 'as is' with no extra path
 * Displays the path from the root (cwd) at the top of the page, with
 each level being a link (HTML anchor)
 * Clicking on any directory displayed in the path outputs a directory listing
@@ -16,9 +25,8 @@ file is cached named _file.md.html_
     * The timestamps of the _.md_ and _.md.html_ files are compared - stale
     _.md.html_ files are re-generated
     * Note: Pandoc expects 4 spaces to generate a sublist - annoying...
-    * Also Note: pandoc -f markdown_github generates \<br> where the source
+    * Also Note: pandoc -f markdown_github generates &lt;br> where the source
     .md file has a newline - also annoying
-
 * Note that links between the .md files can (should) remain as links to .md and not to .md.html
 
 TODO

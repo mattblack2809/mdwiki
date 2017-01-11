@@ -18,7 +18,7 @@ func PrintPath(path string) string {
 	// get rid of empty elemements
 	var elems []string
 	for _, elem := range e {
-		if elem != "" {
+		if elem != "" && elem != "." {
 			elems = append(elems, elem)
 		}
 	}
@@ -41,17 +41,20 @@ func PrintPath(path string) string {
   return res
 }
 
-func FmtDir(path string) string {
+func FmtDir(w io.Writer, path string) {
   // List directory content.  Where a .md and an accompanying .md.html exist
   // suppress the .md.html output: clicking on the .md link will cause any
   // cached .md.html to be returned provided that file is not stale (in which
   // case it is re-generted at the point of access)
-  res := ""
+
+  PrintHTMLHeader(w)
+  fmt.Fprintln(w, PrintPath(path))
+  defer PrintHTMLFooter(w)
 
   dlist, err := ioutil.ReadDir(path)
   if err != nil {
-    res = fmt.Sprintf("Error readind directory listing %q\n", err)
-    return res
+    fmt.Fprintf(w, "Error readind directory listing %q\n", err)
+    return
   }
   // want just the name of the directory in the anchor so it reads
   // dirname/filename (not the full path as the browser does path stuff too)
@@ -80,26 +83,56 @@ func FmtDir(path string) string {
   for _, file := range dlist {
     f, ok := dmap[file.Name()]
     if ok {
-      res += fmt.Sprintf("<a href=\"%s\"> %s</a>\n",
+      fmt.Fprintf(w, "<a href=\"%s\"> %s</a>\n",
         dir+"/"+file.Name(), f)
     }
   }
-  return res
 }
 
-func PrintFile(w io.Writer, path string) {
-  path = mdToHTML(path)
+func PrintFile(w io.Writer, path string, toc bool) {
+  path = mdToHTML(path, toc)
   f, err := os.Open(path)
   if err != nil {
+    PrintHTMLHeader(w)
+    fmt.Fprintln(w, PrintPath(path))
     fmt.Fprintf(w, "Error opening file at path %s: %q\n", path, err)
+    PrintHTMLFooter(w)
     return
   }
   defer f.Close()
 
-  _, err = io.Copy(w, f)
-  if err != nil {
-    fmt.Fprintf(w, "Error copying README.md %q\n", err)
-    return
+  // if the file ends .html, check if it is a complete web page
+  // or a fragment - and either inject the PrintPath in to the full page
+  // or surround the fragment.
+  // For other file types just copy the file content without any path
+  if strings.HasSuffix(path, ".html") {
+    d, err := ioutil.ReadFile(path)
+    if err != nil {
+      PrintHTMLHeader(w)
+      fmt.Fprintln(w, PrintPath(path))
+      fmt.Fprintf(w, "Error reading file at path %s: %q\n", path, err)
+      PrintHTMLFooter(w)
+      return
+    }
+    s := string(d) // horrible but easy
+    idx := strings.Index(s, "<body>")
+    if idx == -1 { // a fragment
+      PrintHTMLHeader(w)
+      fmt.Fprintln(w, PrintPath(path))
+      fmt.Fprint(w, s)
+      PrintHTMLFooter(w)
+      return
+    } else { // A complete web page: inject the path
+      fmt.Fprint(w, s[:idx+6])
+      fmt.Fprintln(w, PrintPath(path))
+      fmt.Fprint(w, s[idx+6:])
+      return
+    }
+  } else {
+    _, err = io.Copy(w, f)
+    if err != nil {
+      fmt.Fprintf(w, "Error copying path $s, %q\n", path, err)
+    }
   }
 }
 
@@ -108,7 +141,9 @@ func PrintFile(w io.Writer, path string) {
 // - check if html version exists with timestamp >= than that of the .md file
 // - return path to valid existing cached html file; otherwise
 // - generate html file and return path to that
-func mdToHTML(path string) string {
+// if toc is true, generate a stand-alone html file with toc
+// (pandoc won't generate a toc for a fragment)
+func mdToHTML(path string, toc bool) string {
   // TODO allow valid extensions additional to .md
   if path[len(path)-3:] != ".md" {
     return path
@@ -124,14 +159,27 @@ func mdToHTML(path string) string {
       return path+".html"
     }
   }
-//  cmd := exec.Command("pandoc", path, "-f", "markdown_github",
-//    "-o", path+".html")
-  cmd := exec.Command("pandoc", path,
-    "-o", path+".html")
+  var cmd *exec.Cmd
+  if toc {
+    cmd = exec.Command("pandoc", path, "-s", "--toc", "--toc-depth=6",
+      "-o", path+".html")
+  } else {
+    cmd = exec.Command("pandoc", path,
+      "-o", path+".html")
+  }
   err = cmd.Run()
   if err != nil {
     log.Printf("Error running pandoc on file %s : %q", path, err)
     return path
   }
   return path+".html"
+}
+
+
+func PrintHTMLHeader(w io.Writer,) {
+  fmt.Fprintln(w, "<html><head><title>MD Wiki</title></head><body>")
+}
+
+func PrintHTMLFooter(w io.Writer,) {
+  fmt.Fprintln(w, "</body></html>")
 }
