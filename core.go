@@ -100,7 +100,6 @@ func PrintFile(w io.Writer, path string, toc bool) {
     return
   }
   defer f.Close()
-
   // if the file ends .html, check if it is a complete web page
   // or a fragment - and either inject the PrintPath in to the full page
   // or surround the fragment.
@@ -145,21 +144,32 @@ func PrintFile(w io.Writer, path string, toc bool) {
 // (pandoc won't generate a toc for a fragment)
 func mdToHTML(path string, toc bool) string {
   // TODO allow valid extensions additional to .md
-  if path[len(path)-3:] != ".md" {
-    return path
-  }
-  mdStat, err := os.Stat(path)
+  stat, err := os.Stat(path)
   if err != nil {
     log.Printf("Error tying os.Stat(%s) : %q", path, err)
     return path
   }
-  htmlStat, err := os.Stat(path+".html")
+  // Update the atime to now - of the source file - not any .md.html file.
+  // On linux, reading the file does NOT update the atime unless
+  // the mtime is greater than the mtime - for performance to avoid
+  // disk writes.  Therefore, for this app, force an update on atime.
+  cmd := exec.Command("touch", path, "-a")
+  err = cmd.Run()
+  if err != nil {
+    log.Printf("Error updating access time on file %s : %q", path, err)
+  }
+  if path[len(path)-3:] != ".md" {
+    return path
+  }
+
+  htmlPath := path+".html"
+  htmlStat, err := os.Stat(htmlPath)
   if err == nil { // file exists then
-    if htmlStat.ModTime().After(mdStat.ModTime()) {
-      return path+".html"
+    if htmlStat.ModTime().After(stat.ModTime()) {
+      return htmlPath
     }
   }
-  var cmd *exec.Cmd
+  //var cmd *exec.Cmd
   if toc {
     cmd = exec.Command("pandoc", path, "-s", "--toc", "--toc-depth=6",
       "-o", path+".html")
