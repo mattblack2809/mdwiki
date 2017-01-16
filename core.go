@@ -25,9 +25,9 @@ func ReadOptions() {
   }
 }
 
-func PrintPath(path string) string {
+func PrintPath(pathFromRoot string) string {
   res := ""
-	e := strings.Split(path, "/")
+	e := strings.Split(pathFromRoot, "/")
 	// get rid of empty elemements
 	var elems []string
 	for _, elem := range e {
@@ -36,9 +36,9 @@ func PrintPath(path string) string {
 		}
 	}
 	link := ""
-	pp := ""
+	pp := "/"
   for n, elem := range elems {
-		pp += "/" + elem
+		pp += elem + "/"
 		if n < len(elems) -1 {
 			link += fmt.Sprintf("&nbsp;/&nbsp;<a href=\"%s\">%s</a>", pp, elem)
 		} else {
@@ -54,14 +54,14 @@ func PrintPath(path string) string {
   return res
 }
 
-func PrintFile(w io.Writer, path string) {
-  path = mdToHTML(path)
-  f, err := os.Open(path)
+func PrintFile(w io.Writer, absPath string, urlPath string) {
+  absPath = mdToHTML(absPath)
+  f, err := os.Open(absPath)
   if err != nil {
     PrintHTMLHeader(w)
-    fmt.Fprintln(w, PrintPath(path))
-    fmt.Fprintf(w, "Error opening file at path %s: %q\n", path, err)
-    log.Printf("Error opening file at path %s: %q\n", path, err)
+    fmt.Fprintln(w, PrintPath(urlPath))
+    fmt.Fprintf(w, "Error opening file at path %s: %q\n", absPath, err)
+    log.Printf("Error opening file at path %s: %q\n", absPath, err)
     PrintHTMLFooter(w)
     return
   }
@@ -70,37 +70,37 @@ func PrintFile(w io.Writer, path string) {
   // or a fragment - and either inject the PrintPath in to the full page
   // or surround the fragment.
   // For other file types just copy the file content without any path
-  if strings.HasSuffix(path, ".html") {
-    d, err := ioutil.ReadFile(path)
+  if strings.HasSuffix(absPath, ".html") {
+    d, err := ioutil.ReadFile(absPath)
     if err != nil {
       PrintHTMLHeader(w)
-      fmt.Fprintln(w, PrintPath(path))
-      fmt.Fprintf(w, "Error reading file at path %s: %q\n", path, err)
-      log.Printf("Error reading file at path %s: %q\n", path, err)
+      fmt.Fprintln(w, PrintPath(urlPath))
+      fmt.Fprintf(w, "Error reading file at path %s: %q\n", absPath, err)
+      log.Printf("Error reading file at path %s: %q\n", absPath, err)
       PrintHTMLFooter(w)
       return
     }
     s := string(d) // horrible but easy
     idx := strings.Index(s, "<body>")
     if idx == -1 { // a fragment
-      log.Println("printing HTML fragment at path", path)
+      log.Println("printing HTML fragment at path", absPath)
       PrintHTMLHeader(w)
-      fmt.Fprintln(w, PrintPath(path))
+      fmt.Fprintln(w, PrintPath(urlPath))
       fmt.Fprint(w, s)
       PrintHTMLFooter(w)
       return
     } else { // A complete web page: inject the path
-      log.Println("printing complete HTML file at path", path)
+      log.Println("printing complete HTML file at path", absPath)
       fmt.Fprint(w, s[:idx+6])
-      fmt.Fprintln(w, PrintPath(path))
+      fmt.Fprintln(w, PrintPath(urlPath))
       fmt.Fprint(w, s[idx+6:])
       return
     }
   } else {
-    log.Println("printing non-HTML file", path)
+    log.Println("printing non-HTML file", absPath)
     _, err = io.Copy(w, f)
     if err != nil {
-      fmt.Fprintf(w, "Error copying path $s, %q\n", path, err)
+      fmt.Fprintf(w, "Error copying path $s, %q\n", absPath, err)
     }
   }
 }

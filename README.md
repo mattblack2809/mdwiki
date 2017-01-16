@@ -2,10 +2,11 @@
 
 
 #### Purpose (what is it for):
-* Provide browser access to a directory tree (cwd aka '.' as root) of (primarily) markdown documents using pandoc to render markdown as HTML
+* Provides browser access to a directory tree of (primarily) markdown documents using pandoc to render markdown as HTML
 * Works with a document set that may be less than perfectly cross-referenced -
 by providing directory listings and optional auto-generation of a table-of-content
-for each document  
+for each document
+* Example use: mdwiki -port=8008 -root=/home/matt/docs -toc=true
 
 
 #### What (does it do)
@@ -20,13 +21,12 @@ formatted output
   modified and last accessed time for each file
 
 #### How (does it do it)
-* Options may be specified one per line in mdwiki.conf, and overridden using
-    the command line (option name preceded by '-')
-    * port=nnnn - default to 8000
-    * toc=true instructs pandoc to output a fully structered HTML
-    document with a table of contents - useful if the documents are not well
-    indexed, overrides some other options
-    * Be aware use of the browser back-button may display stale directory listings.
+* Options may be specified one per line in mdwiki.conf (read from cwd), and
+  overridden using command line options
+    * run mdwiki -help for list of options
+    * Be aware:
+        * Use of the browser back-button may display stale directory listings
+        * mdwiki does not follow symbolic links
 * A URL requesting _file.md_ outputs the pandoc conversion to HTML.  The HTML
 file is cached named _file.md.html_
     * Links between the .md files can (should) remain as links
@@ -40,9 +40,12 @@ file is cached named _file.md.html_
     * File access time 'atime' is OS dependent and also 'broken' by design: for
     performance reasons - to avoid a disk write - both linux and Windows do not
     update atime when a file is read in most circumstances.  Reading the atime is
-    OS specific TODO Windows and build tags, and update of atime is achieved
+    OS specific - hence use of build tags to compile for linux or Windows,
+    and update of atime is achieved
     by executing 'touch -a <file>' which on Windows assumes installation of a
     touch executable such as is intalled part of git bash...
+    * Any anchor referring to a directory must end with a "/" character in order
+    to have the web browser prepend the path from the site root
 
 TODO
 
