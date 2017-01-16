@@ -2,15 +2,28 @@ package mdwiki
 
 import (
   "fmt"
-  "path/filepath"
   "strings"
   "io"
   "io/ioutil"
   "log"
   "os"
   "os/exec"
+  "bufio"
 )
 
+var Options = make(map[string]string)
+func ReadOptions() {
+  file, err :=os.Open("mdwiki.conf")
+  if err != nil {
+      return
+  }
+  defer file.Close()
+  scanner := bufio.NewScanner(file)
+  for scanner.Scan() {
+      fields := strings.Split(scanner.Text(), ",")
+      Options[strings.TrimSpace(fields[0])] = strings.TrimSpace(fields[1])
+  }
+}
 
 func PrintPath(path string) string {
   res := ""
@@ -41,61 +54,14 @@ func PrintPath(path string) string {
   return res
 }
 
-func FmtDir(w io.Writer, path string) {
-  // List directory content.  Where a .md and an accompanying .md.html exist
-  // suppress the .md.html output: clicking on the .md link will cause any
-  // cached .md.html to be returned provided that file is not stale (in which
-  // case it is re-generted at the point of access)
-
-  PrintHTMLHeader(w)
-  fmt.Fprintln(w, PrintPath(path))
-  defer PrintHTMLFooter(w)
-
-  dlist, err := ioutil.ReadDir(path)
-  if err != nil {
-    fmt.Fprintf(w, "Error readind directory listing %q\n", err)
-    return
-  }
-  // want just the name of the directory in the anchor so it reads
-  // dirname/filename (not the full path as the browser does path stuff too)
-  _, dir := filepath.Split(path) // get directory name
-  // remember you can't futz with a map whilst iterating it
-  dmap := make(map[string]string) // key on file name, value the display name
-  var mds []string
-  for _, file := range dlist {
-    fname := file.Name()
-    if strings.HasSuffix(fname, ".md.html") {
-      dmap[fname] = fname[:len(fname) - 8]
-    } else if strings.HasSuffix(fname, ".md") {
-      mds = append(mds, fname)
-      dmap[fname] = fname[:len(fname) - 3]
-    } else {
-      dmap[fname] = fname
-    }
-  }
-  // remove the entries for .md.html files where there is a .md source
-  for _, md := range mds {
-    delete(dmap, md+".html")
-  }
-
-  // should sort alpha (or whatever) - for now use dlist again
-
-  for _, file := range dlist {
-    f, ok := dmap[file.Name()]
-    if ok {
-      fmt.Fprintf(w, "<a href=\"%s\"> %s</a>\n",
-        dir+"/"+file.Name(), f)
-    }
-  }
-}
-
-func PrintFile(w io.Writer, path string, toc bool) {
-  path = mdToHTML(path, toc)
+func PrintFile(w io.Writer, path string) {
+  path = mdToHTML(path)
   f, err := os.Open(path)
   if err != nil {
     PrintHTMLHeader(w)
     fmt.Fprintln(w, PrintPath(path))
     fmt.Fprintf(w, "Error opening file at path %s: %q\n", path, err)
+    log.Printf("Error opening file at path %s: %q\n", path, err)
     PrintHTMLFooter(w)
     return
   }
@@ -110,24 +76,28 @@ func PrintFile(w io.Writer, path string, toc bool) {
       PrintHTMLHeader(w)
       fmt.Fprintln(w, PrintPath(path))
       fmt.Fprintf(w, "Error reading file at path %s: %q\n", path, err)
+      log.Printf("Error reading file at path %s: %q\n", path, err)
       PrintHTMLFooter(w)
       return
     }
     s := string(d) // horrible but easy
     idx := strings.Index(s, "<body>")
     if idx == -1 { // a fragment
+      log.Println("printing HTML fragment at path", path)
       PrintHTMLHeader(w)
       fmt.Fprintln(w, PrintPath(path))
       fmt.Fprint(w, s)
       PrintHTMLFooter(w)
       return
     } else { // A complete web page: inject the path
+      log.Println("printing complete HTML file at path", path)
       fmt.Fprint(w, s[:idx+6])
       fmt.Fprintln(w, PrintPath(path))
       fmt.Fprint(w, s[idx+6:])
       return
     }
   } else {
+    log.Println("printing non-HTML file", path)
     _, err = io.Copy(w, f)
     if err != nil {
       fmt.Fprintf(w, "Error copying path $s, %q\n", path, err)
@@ -142,7 +112,7 @@ func PrintFile(w io.Writer, path string, toc bool) {
 // - generate html file and return path to that
 // if toc is true, generate a stand-alone html file with toc
 // (pandoc won't generate a toc for a fragment)
-func mdToHTML(path string, toc bool) string {
+func mdToHTML(path string) string {
   // TODO allow valid extensions additional to .md
   stat, err := os.Stat(path)
   if err != nil {
@@ -165,15 +135,26 @@ func mdToHTML(path string, toc bool) string {
   htmlPath := path+".html"
   htmlStat, err := os.Stat(htmlPath)
   if err == nil { // file exists then
-    if htmlStat.ModTime().After(stat.ModTime()) {
+    if Options["no-cache"] != "true" &&
+        htmlStat.ModTime().After(stat.ModTime()) {
+      log.Println("using path to cached file", htmlPath)
       return htmlPath
     }
   }
   //var cmd *exec.Cmd
-  if toc {
+  if Options["toc"] == "true" {
+    log.Println("option -toc set: generating output file", path)
     cmd = exec.Command("pandoc", path, "-s", "--toc", "--toc-depth=6",
       "-o", path+".html")
+  } else if opts, ok := Options["pandoc-args"]; ok {
+      execArgs := []string{path, "-o", path+".html"}
+      fields := strings.Fields(opts)
+      execArgs = append(execArgs, fields...)
+      log.Printf("pandoc-args set, output to path %s with arggs\n",
+        path+".html", execArgs)
+      cmd = exec.Command("pandoc", execArgs...)
   } else {
+    log.Println("generating output file", path)
     cmd = exec.Command("pandoc", path,
       "-o", path+".html")
   }

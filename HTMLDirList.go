@@ -6,12 +6,10 @@ import (
   "strings"
   "io"
   "io/ioutil"
-  //"log"
+  "log"
   "os"
   "html/template"
   "time"
-  "syscall"
-
 )
 
 func FilteredReadDir(path string) ([]os.FileInfo, error) {
@@ -80,33 +78,6 @@ const dirTempl = `
 </table>
 `
 
-
-// <td>{{. | accessTime}}</td>
-
-// determine the OS and make correct syscall
-// refer to https://github.com/djherbis/times/blob/master/times_linux.go
-func accessTime(fi os.FileInfo) string {
-  // assume linux now
-  return tfmt(getLinuxAtime(fi))
-}
-
-// WINDOWS
-//https://github.com/djherbis/times/blob/master/times_windows.go
-//func getTimespec(fi os.FileInfo) Timespec {
-//	var t timespec
-//	stat := fi.Sys().(*syscall.Win32FileAttributeData)
-//	t.atime.v = time.Unix(0, stat.LastAccessTime.Nanoseconds())
-//	t.mtime.v = time.Unix(0, stat.LastWriteTime.Nanoseconds())
-//	t.btime.v = time.Unix(0, stat.CreationTime.Nanoseconds())
-//	return t
-//}
-
-func getLinuxAtime(fi os.FileInfo) (time.Time) {
-	stat := fi.Sys().(*syscall.Stat_t)
-  t := time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
-  return t
-}
-
 func tfmt(t time.Time) string {
   //return t.Format("Mon Jan 2 15:04:05 -0700 MST 2006")
   return t.Format("2006 01 02 (Mon) 15:04:05")
@@ -117,7 +88,7 @@ func addDir(fname string) string {
   return dir+"/"+fname // put the directory name in front
 }
 func ShortenName(name string) string {
-  fmt.Println(name)
+  //fmt.Println(name)
   if strings.HasSuffix(name, ".md.html")  {  // hopefully already stripped
    return name[:len(name) - 8]
   } else if strings.HasSuffix(name, ".md") {
@@ -133,6 +104,7 @@ func HTMLDirList(w io.Writer, path string) {
   // cached .md.html to be returned provided that file is not stale (in which
   // case it is re-generted at the point of access)
 
+  log.Println("printing directory", path)
   PrintHTMLHeader(w)
   fmt.Fprintln(w, PrintPath(path))
   defer PrintHTMLFooter(w)
@@ -161,4 +133,51 @@ func HTMLDirList(w io.Writer, path string) {
 //    }
 //    fmt.Fprintf(w, "<a href=\"%s\"> %s</a>\n", dir+"/"+fName, displayName)
 //  }
+}
+
+// superceded by HTMLDirList
+func FmtDir(w io.Writer, path string) {
+  // List directory content.  Where a .md and an accompanying .md.html exist
+  // suppress the .md.html output: clicking on the .md link will cause any
+  // cached .md.html to be returned provided that file is not stale (in which
+  // case it is re-generted at the point of access)
+
+  PrintHTMLHeader(w)
+  fmt.Fprintln(w, PrintPath(path))
+  defer PrintHTMLFooter(w)
+
+  dlist, err := ioutil.ReadDir(path)
+  if err != nil {
+    fmt.Fprintf(w, "Error readind directory listing %q\n", err)
+    return
+  }
+  // want just the name of the directory in the anchor so it reads
+  // dirname/filename (not the full path as the browser does path stuff too)
+  _, dir := filepath.Split(path) // get directory name
+  // remember you can't futz with a map whilst iterating it
+  dmap := make(map[string]string) // key on file name, value the display name
+  var mds []string
+  for _, file := range dlist {
+    fname := file.Name()
+    if strings.HasSuffix(fname, ".md.html") {
+      dmap[fname] = fname[:len(fname) - 8]
+    } else if strings.HasSuffix(fname, ".md") {
+      mds = append(mds, fname)
+      dmap[fname] = fname[:len(fname) - 3]
+    } else {
+      dmap[fname] = fname
+    }
+  }
+  // remove the entries for .md.html files where there is a .md source
+  for _, md := range mds {
+    delete(dmap, md+".html")
+  }
+  // should sort alpha (or whatever) - for now use dlist again
+  for _, file := range dlist {
+    f, ok := dmap[file.Name()]
+    if ok {
+      fmt.Fprintf(w, "<a href=\"%s\"> %s</a>\n",
+        dir+"/"+file.Name(), f)
+    }
+  }
 }
