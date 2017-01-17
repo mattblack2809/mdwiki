@@ -1,3 +1,6 @@
+// package mdwiki provides functions to read options, print a clickable version
+// of the URL at the top of the page, and output a file.
+// Markdown files are converted to HTML using pandoc.
 package mdwiki
 
 import (
@@ -11,6 +14,8 @@ import (
   "bufio"
 )
 
+// Options are read at program start from mdwiki.conf (if present in cwd) and
+// updated with any command line flags (this under control of the main package)
 var Options = make(map[string]string)
 func ReadOptions() {
   file, err :=os.Open("mdwiki.conf")
@@ -25,6 +30,9 @@ func ReadOptions() {
   }
 }
 
+// PrintPath generates an HTML fragment that provides a clickable
+// representation of the URL allowing the user to click to obtain a
+// directory listing of any level under/at the site root
 func PrintPath(path string) string {
   res := ""
 	e := strings.Split(path, "/")
@@ -54,6 +62,11 @@ func PrintPath(path string) string {
   return res
 }
 
+// PrintFile outputs non-HTML files 'as is' with no path header at the top of
+// the page.  HTML content is generated with the clickable path as the first
+// content in <body>: HTML fragment files are wrapped with an HTML header,
+// clickable path, and HTML footer; while fully formed HTML files are output
+// with the clickable path injected at the start of the <body>.
 func PrintFile(w io.Writer, path string) {
   path = mdToHTML(path)
   f, err := os.Open(path)
@@ -105,13 +118,11 @@ func PrintFile(w io.Writer, path string) {
   }
 }
 
-// mdToHTML does the following:
-// - return if path does not end .md
-// - check if html version exists with timestamp >= than that of the .md file
-// - return path to valid existing cached html file; otherwise
-// - generate html file and return path to that
-// if toc is true, generate a stand-alone html file with toc
-// (pandoc won't generate a toc for a fragment)
+// mdToHTML returns the path unmodified for non-HTML files.
+// Markdown .md files are converted to HTML using pandoc: options to pandoc
+// can be specified to auto-generate a table of content within the file.
+// Generated .md.html files are cached and re-used (unless the -no-cache
+// option is set)
 func mdToHTML(path string) string {
   // TODO allow valid extensions additional to .md
   stat, err := os.Stat(path)
@@ -119,8 +130,8 @@ func mdToHTML(path string) string {
     log.Printf("Error tying os.Stat(%s) : %q", path, err)
     return path
   }
-  // Update the atime to now - of the source file - not any .md.html file.
-  // On linux, reading the file does NOT update the atime unless
+  // Update the atime to now - of the source .md file - not any .md.html file.
+  // On linux/Windows reading the file does NOT update the atime unless
   // the mtime is greater than the mtime - for performance to avoid
   // disk writes.  Therefore, for this app, force an update on atime.
   cmd := exec.Command("touch", path, "-a")
@@ -141,7 +152,6 @@ func mdToHTML(path string) string {
       return htmlPath
     }
   }
-  //var cmd *exec.Cmd
   if Options["toc"] == "true" {
     log.Println("option -toc set: generating output file", path)
     cmd = exec.Command("pandoc", path, "-s", "--toc", "--toc-depth=6",

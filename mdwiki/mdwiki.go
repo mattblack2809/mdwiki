@@ -1,3 +1,15 @@
+// package main provides the top level structure of mdwiki (Markdown widi).
+// It reads options allowing defaults to be over-written firstly by the
+// content of mdwiki.conf (read from the current directory) and then by
+// command line options.  Run mdwiki -help for information on the options.
+// An http server is started with a single handler function that stats the
+// file pointed to by the URL to determine whether to ouput a directory listing
+// or the file itself.
+// Non-HTML files are output 'as is' while markwoen / HTML files are output with a
+// clickable file path displayed at the top of the screen.
+// Markdown files are converted to HTML on-the-fly using pandoc - with caching,
+// and optionally with a table of content for each .md file generated out of
+// the pandoc conversion.
 package main
 
 import (
@@ -9,6 +21,8 @@ import (
   "os"
 //  "time"
 )
+
+// main reads options, registers a handler, and starts an http server
 func main() {
   port := flag.String("port", "8000", "port to listen on")
   toc := flag.Bool("toc", false, "true to automatically generate tables of content")
@@ -41,6 +55,8 @@ func main() {
   fmt.Fprintln(os.Stderr, http.ListenAndServe(hostPort, nil))  // port 80 access perm error
 }
 
+// handler stats the file pointed to by the URL, tests if it is a directory,
+// and invokes the functions to output either a directory listing or the file
 func handler(w http.ResponseWriter, r *http.Request) {
   path := "." + r.URL.Path
   finfo, err := os.Stat(path)

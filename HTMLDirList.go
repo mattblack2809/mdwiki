@@ -12,6 +12,8 @@ import (
   "time"
 )
 
+// FilteredReadDir removes files named .md.html from the FileInfo slice
+// where there is a coresponding .md file
 func FilteredReadDir(path string) ([]os.FileInfo, error) {
   // Where a .md and an accompanying .md.html exist
   // suppress the .md.html output
@@ -42,6 +44,9 @@ func FilteredReadDir(path string) ([]os.FileInfo, error) {
   return retList, nil
 }
 
+// dirReport is the compiled version of a static HTML template used to
+// output directory listings.  It registers functions that are called
+// within the template.
 var dirReport = template.Must(template.New("dirlist").Funcs(
     template.FuncMap{
       "ShortenName": ShortenName,
@@ -49,7 +54,6 @@ var dirReport = template.Must(template.New("dirlist").Funcs(
         "tfmt": tfmt,
         "accessTime": accessTime,
     }).Parse(dirTempl))
-// dirTempl designed to work with os.FileInfo
 const dirTempl = `
 <style type="text/css">
  table.ex1 {border-spacing: 0}
@@ -78,12 +82,14 @@ const dirTempl = `
 </table>
 `
 
+// tfmt uses the 'canonical' base time example in Go to format a time.Time
+// as a string
 func tfmt(t time.Time) string {
   //return t.Format("Mon Jan 2 15:04:05 -0700 MST 2006")
   return t.Format("2006 01 02 (Mon) 15:04:05")
 }
 
-var dir string // prepend to filename
+//var dir string // prepend to filename
 func addDir(fname string) string {
   return dir+"/"+fname // put the directory name in front
 }
