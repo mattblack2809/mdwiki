@@ -7,20 +7,27 @@ import (
   "io"
   "io/ioutil"
   "log"
-  "os"
+  //"os"
   "html/template"
   "time"
 )
 
+type dirDisplay struct {
+  DisplayName string
+  Anchor string
+  Size string
+  Modified string
+  Accessed string
+}
 // FilteredReadDir removes files named .md.html from the FileInfo slice
 // where there is a coresponding .md file
-func FilteredReadDir(path string) ([]os.FileInfo, error) {
+func FilteredReadDir(path string) ([]dirDisplay) {
   // Where a .md and an accompanying .md.html exist
   // suppress the .md.html output
-  var retList []os.FileInfo
+  var retList []dirDisplay
   dlist, err := ioutil.ReadDir(path)
   if err != nil {
-    return nil, err
+    return nil
   }
   // remember you can't futz with a map whilst iterating it
   dmap := make(map[string]bool) // key on file name, value immaterial
@@ -38,10 +45,20 @@ func FilteredReadDir(path string) ([]os.FileInfo, error) {
   }
   for _, file := range dlist {
     if _, ok := dmap[file.Name()]; ok {
-      retList = append(retList, file)
+      var display dirDisplay
+      display.DisplayName = file.Name()
+      display.Size = fmt.Sprintf("%d", file.Size())
+      display.Modified = tfmt(file.ModTime())
+      display.Accessed = accessTime(file)
+      if file.IsDir() {
+        display.Anchor = file.Name() + "/" // tell browser to prepend relative URL
+      } else {
+        display.Anchor = file.Name()
+      }
+      retList = append(retList, display)
     }
   }
-  return retList, nil
+  return retList
 }
 
 // dirReport is the compiled version of a static HTML template used to
@@ -50,9 +67,6 @@ func FilteredReadDir(path string) ([]os.FileInfo, error) {
 var dirReport = template.Must(template.New("dirlist").Funcs(
     template.FuncMap{
       "ShortenName": ShortenName,
-      "addDir": addDir,
-        "tfmt": tfmt,
-        "accessTime": accessTime,
     }).Parse(dirTempl))
 const dirTempl = `
 <style type="text/css">
@@ -73,10 +87,10 @@ const dirTempl = `
 </tr>
 {{range .}}
 <tr>
-<td><a href='{{.Name | addDir}}'>{{.Name | ShortenName}}</a></td>
+<td><a href='{{.Anchor}}'>{{.DisplayName | ShortenName}}</a></td>
 <td>{{.Size}}</td>
-<td>{{.ModTime | tfmt}}</td>
-<td>{{. | accessTime}}</td>
+<td>{{.Modified}}</td>
+<td>{{.Accessed}}</td>
 </tr>
 {{end}}
 </table>
@@ -89,12 +103,7 @@ func tfmt(t time.Time) string {
   return t.Format("2006 01 02 (Mon) 15:04:05")
 }
 
-//var dir string // prepend to filename
-func addDir(fname string) string {
-  return dir+"/"+fname // put the directory name in front
-}
 func ShortenName(name string) string {
-  //fmt.Println(name)
   if strings.HasSuffix(name, ".md.html")  {  // hopefully already stripped
    return name[:len(name) - 8]
   } else if strings.HasSuffix(name, ".md") {
@@ -104,28 +113,21 @@ func ShortenName(name string) string {
   }
 }
 
-func HTMLDirList(w io.Writer, path string) {
+func HTMLDirList(w io.Writer, absPath string, urlPath string) {
   // List directory content.  Where a .md and an accompanying .md.html exist
   // suppress the .md.html output: clicking on the .md link will cause any
   // cached .md.html to be returned provided that file is not stale (in which
   // case it is re-generted at the point of access)
 
-  log.Println("printing directory", path)
+  log.Println("printing directory", absPath)
   PrintHTMLHeader(w)
-  fmt.Fprintln(w, PrintPath(path))
+  fmt.Fprintln(w, PrintPath(urlPath))
   defer PrintHTMLFooter(w)
 
-  dlist, err := FilteredReadDir(path)
-  if err != nil {
-    fmt.Fprintf(w, "Error reading filtered directory listing %q\n", err)
-    return
-  }
-  // want just the name of the directory in the anchor so it reads
-  // dirname/filename (not the full path as the browser does path stuff too)
-  _, dir = filepath.Split(path) // get directory name - put in package var
+  dlist := FilteredReadDir(absPath)
 
   // should sort alpha (or whatever) - for now use dlist again
-  err = dirReport.Execute(w, dlist)
+  err := dirReport.Execute(w, dlist)
   if err != nil {
     fmt.Fprintf(w, "Error executing html template", err)
   }
