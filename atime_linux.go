@@ -1,23 +1,22 @@
-// +build linux
 package mdwiki
+// +build linux
 
 import (
-  "os"
-  "time"
-  "syscall"
-
+	"os"
+	"syscall"
+	"time"
 )
 
 // refer to https://github.com/djherbis/times/blob/master/times_linux.go
 func accessTime(fi os.FileInfo) string {
-  return tfmt(getLinuxAtime(fi))
+	return tfmt(getLinuxAtime(fi))
 }
 
 //  Linux
 func getLinuxAtime(fi os.FileInfo) time.Time {
-  stat := fi.Sys().(*syscall.Stat_t)
-  t := time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
-  return t
+	stat := fi.Sys().(*syscall.Stat_t)
+	t := time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
+	return t
 }
 
 // WINDOWS
