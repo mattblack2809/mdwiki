@@ -2,7 +2,7 @@ package mdwiki
 
 import (
   "fmt"
-  "path/filepath"
+  //"path/filepath"
   "strings"
   "io"
   "io/ioutil"
@@ -12,6 +12,8 @@ import (
   "time"
 )
 
+// dirDisplay filled out be <func> and used during running the HTML template
+// to display a directory
 type dirDisplay struct {
   DisplayName string
   Anchor string
@@ -103,6 +105,7 @@ func tfmt(t time.Time) string {
   return t.Format("2006 01 02 (Mon) 15:04:05")
 }
 
+// ShortenName stips any .md.html or .md sufffix from the passed name
 func ShortenName(name string) string {
   if strings.HasSuffix(name, ".md.html")  {  // hopefully already stripped
    return name[:len(name) - 8]
@@ -113,79 +116,20 @@ func ShortenName(name string) string {
   }
 }
 
+// HTMLDirList
+// List directory content.  Where a .md and an accompanying .md.html exist
+// suppress the .md.html output: clicking on the .md link will cause any
+// cached .md.html to be returned provided that file is not stale (in which
+// case it is re-generted at the point of access)
 func HTMLDirList(w io.Writer, absPath string, urlPath string) {
-  // List directory content.  Where a .md and an accompanying .md.html exist
-  // suppress the .md.html output: clicking on the .md link will cause any
-  // cached .md.html to be returned provided that file is not stale (in which
-  // case it is re-generted at the point of access)
 
   log.Println("printing directory", absPath)
   PrintHTMLHeader(w)
   fmt.Fprintln(w, PrintPath(urlPath))
   defer PrintHTMLFooter(w)
-
   dlist := FilteredReadDir(absPath)
-
-  // should sort alpha (or whatever) - for now use dlist again
   err := dirReport.Execute(w, dlist)
   if err != nil {
     fmt.Fprintf(w, "Error executing html template", err)
-  }
-//  for _, file := range dlist {
-//    fName := file.Name()
-//    displayName := fName
-//    if strings.HasSuffix(fName, ".md.html")  {  // hopefully already stripped
-//      displayName = fName[:len(fName) - 8]
-//    } else if strings.HasSuffix(fName, ".md") {
-//      displayName = fName[:len(fName) - 3]
-//    }
-//    fmt.Fprintf(w, "<a href=\"%s\"> %s</a>\n", dir+"/"+fName, displayName)
-//  }
-}
-
-// superceded by HTMLDirList
-func FmtDir(w io.Writer, path string) {
-  // List directory content.  Where a .md and an accompanying .md.html exist
-  // suppress the .md.html output: clicking on the .md link will cause any
-  // cached .md.html to be returned provided that file is not stale (in which
-  // case it is re-generted at the point of access)
-
-  PrintHTMLHeader(w)
-  fmt.Fprintln(w, PrintPath(path))
-  defer PrintHTMLFooter(w)
-
-  dlist, err := ioutil.ReadDir(path)
-  if err != nil {
-    fmt.Fprintf(w, "Error readind directory listing %q\n", err)
-    return
-  }
-  // want just the name of the directory in the anchor so it reads
-  // dirname/filename (not the full path as the browser does path stuff too)
-  _, dir := filepath.Split(path) // get directory name
-  // remember you can't futz with a map whilst iterating it
-  dmap := make(map[string]string) // key on file name, value the display name
-  var mds []string
-  for _, file := range dlist {
-    fname := file.Name()
-    if strings.HasSuffix(fname, ".md.html") {
-      dmap[fname] = fname[:len(fname) - 8]
-    } else if strings.HasSuffix(fname, ".md") {
-      mds = append(mds, fname)
-      dmap[fname] = fname[:len(fname) - 3]
-    } else {
-      dmap[fname] = fname
-    }
-  }
-  // remove the entries for .md.html files where there is a .md source
-  for _, md := range mds {
-    delete(dmap, md+".html")
-  }
-  // should sort alpha (or whatever) - for now use dlist again
-  for _, file := range dlist {
-    f, ok := dmap[file.Name()]
-    if ok {
-      fmt.Fprintf(w, "<a href=\"%s\"> %s</a>\n",
-        dir+"/"+file.Name(), f)
-    }
   }
 }
