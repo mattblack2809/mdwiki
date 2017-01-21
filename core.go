@@ -72,7 +72,7 @@ func PrintPath(pathFromRoot string) string {
 // clickable path, and HTML footer; while fully formed HTML files are output
 // with the clickable path injected at the start of the <body>.
 func PrintFile(w io.Writer, absPath string, urlPath string) {
-	absPath = mdToHTML(absPath)
+	absPath = markupToHTML(absPath)
 	f, err := os.Open(absPath)
 	if err != nil {
 		printHTMLHeader(w)
@@ -121,12 +121,12 @@ func PrintFile(w io.Writer, absPath string, urlPath string) {
 	}
 }
 
-// mdToHTML returns the path unmodified for non-HTML files.
-// Markdown .md files are converted to HTML using pandoc: options to pandoc
+// markupToHTML returns the path unmodified for non-HTML files.
+// Markdown .md/.ad files are converted to HTML using pandoc/asciidoc: options to pandoc
 // can be specified to auto-generate a table of content within the file.
 // Generated .md.html files are cached and re-used (unless the -no-cache
 // option is set)
-func mdToHTML(path string) string {
+func markupToHTML(path string) string {
 	// TODO allow valid extensions additional to .md
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -142,7 +142,7 @@ func mdToHTML(path string) string {
 	if err != nil {
 		log.Printf("Error updating access time on file %s : %q", path, err)
 	}
-	if path[len(path)-3:] != ".md" {
+	if path[len(path)-3:] != ".md" && path[len(path)-3:] != ".ad" {
 		return path
 	}
 
@@ -155,27 +155,48 @@ func mdToHTML(path string) string {
 			return htmlPath
 		}
 	}
-	if Options["toc"] == "true" {
-		log.Println("option -toc set: generating output file", path)
-		cmd = exec.Command("pandoc", path, "-s", "--toc", "--toc-depth=6",
-			"-o", path+".html")
-	} else if opts, ok := Options["pandoc-args"]; ok {
-		execArgs := []string{path, "-o", path + ".html"}
-		fields := strings.Fields(opts)
-		execArgs = append(execArgs, fields...)
-		log.Printf("pandoc-args set, output to path %s with arggs\n",
-			path+".html", execArgs)
-		cmd = exec.Command("pandoc", execArgs...)
-	} else {
-		log.Println("generating output file", path)
-		cmd = exec.Command("pandoc", path,
-			"-o", path+".html")
+
+	// deal with .md files ussing pandoc
+	if path[len(path)-3:] == ".md" {
+		if Options["toc"] == "true" {
+			log.Println("option -toc set: generating output file", path)
+			cmd = exec.Command("pandoc", path, "-s", "--toc", "--toc-depth=6",
+				"-o", path+".html")
+		} else if opts, ok := Options["pandoc-args"]; ok {
+			execArgs := []string{path, "-o", path + ".html"}
+			fields := strings.Fields(opts)
+			execArgs = append(execArgs, fields...)
+			log.Printf("pandoc-args set, output to path %s with arggs\n",
+				path+".html", execArgs)
+			cmd = exec.Command("pandoc", execArgs...)
+		} else {
+			log.Println("generating output file", path)
+			cmd = exec.Command("pandoc", path,
+				"-o", path+".html")
+		}
+		err = cmd.Run()
+		if err != nil {
+			log.Printf("Error running pandoc on file %s : %q", path, err)
+			return path
+		}
 	}
-	err = cmd.Run()
-	if err != nil {
-		log.Printf("Error running pandoc on file %s : %q", path, err)
-		return path
+
+	// deal with .ad files using asciidoc
+	if path[len(path)-3:] == ".ad" {
+		o := fmt.Sprintf("--out-file=%s", path+".html")
+		execArgs := []string{o, path}
+		//fields := strings.Fields(opts)
+		//execArgs = append(execArgs, fields...)
+		//log.Printf("asciidoc-args set, output to path %s with arggs\n",
+		//	path+".html", execArgs)
+		cmd = exec.Command("asciidoc", execArgs...)
+		err = cmd.Run()
+		if err != nil {
+			log.Printf("Error running asciidoc on file %s : %q", path, err)
+			return path
+		}
 	}
+
 	return path + ".html"
 }
 

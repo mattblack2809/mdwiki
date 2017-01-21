@@ -35,16 +35,23 @@ func filteredReadDir(path string) []dirDisplay {
 	// remember you can't futz with a map whilst iterating it
 	dmap := make(map[string]bool) // key on file name, value immaterial
 	var mds []string
+	var ads []string
 	for _, file := range dlist {
 		fname := file.Name()
 		dmap[fname] = true
 		if strings.HasSuffix(fname, ".md") {
 			mds = append(mds, fname)
 		}
+		if strings.HasSuffix(fname, ".ad") {
+			ads = append(mds, fname)
+		}
 	}
 	// remove the entries for .md.html files where there is a .md source
 	for _, md := range mds {
 		delete(dmap, md+".html") // deleting non-existent key is OK
+	}
+	for _, ad := range ads {
+		delete(dmap, ad+".html") // deleting non-existent key is OK
 	}
 	for _, file := range dlist {
 		if _, ok := dmap[file.Name()]; ok {
@@ -107,13 +114,17 @@ func tfmt(t time.Time) string {
 	return t.Format("2006 01 02 (Mon) 15:04:05")
 }
 
-// ShortenName stips any .md.html or .md sufffix from the passed name
+// ShortenName stips any .md.html/ad.html or .md/.ad sufffix from the passed name
 func ShortenName(name string) string {
 	if strings.HasSuffix(name, ".md.html") { // hopefully already stripped
 		return name[:len(name)-8]
 	} else if strings.HasSuffix(name, ".md") {
 		return name[:len(name)-3]
-	} else {
+	} else if strings.HasSuffix(name, ".ad.html") { // hopefully already stripped
+			return name[:len(name)-8]
+		} else if strings.HasSuffix(name, ".ad") {
+			return name[:len(name)-3]
+		} else {
 		return name
 	}
 }

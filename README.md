@@ -2,7 +2,7 @@
 
 
 #### Purpose (what is it for):
-* Provides browser access to a directory tree of (primarily) markdown documents using pandoc to render markdown as HTML
+* Provides browser access to a directory tree of (primarily) markdown documents using pandoc a(for .md files) and asciidoc (for .ad files) to render markdown as HTML
 * Works with a document set that may be less than perfectly cross-referenced -
 by providing directory listings and optional auto-generation of a table-of-content
 for each document
@@ -15,7 +15,7 @@ formatted output
 * HTML fragments are output wrapped with a header, the (generated clickable)
   path, and footer, while HTML fully structured files are output with the path
   injected at the start of the body
-  * .md files display without the .md, and when clicked generate HTML output
+  * .md and .ad files display without the .md, and when clicked generate HTML output
 * Non-html files are displayed 'as-is' with no injected path information
 * The access time stamp is updated per view, so that the user sees the last
   modified and last accessed time for each file
@@ -27,12 +27,12 @@ formatted output
     * Be aware:
         * Use of the browser back-button may display stale directory listings
         * mdwiki does not follow symbolic links
-* A URL requesting _file.md_ outputs the pandoc conversion to HTML.  The HTML
-file is cached named _file.md.html_
-    * Links between the .md files can (should) remain as links
-     to .md and not to .md.html
-    * The timestamps of the _.md_ and _.md.html_ files are compared - stale
-    _.md.html_ files are re-generated
+* A URL requesting _file.**md**_ outputs the pandoc conversion to HTML.  The HTML
+file is cached named _file.md.html_.  Similarly, equesting _file.**ad**_ outputs the asciidoc conversion to HTML
+    * Links between the .md and .ad files can (should) remain as links
+     to .md/.ad and not to .md.html/.ad.html
+    * The timestamps of the markup and _.html_ files are compared - stale
+    _.html_ files are re-generated
     * Note: Pandoc expects 4 spaces to generate a sublist - annoying...
     * Also Note: pandoc -f markdown_github generates &lt;br> where the source
     .md file has a newline - also annoying
